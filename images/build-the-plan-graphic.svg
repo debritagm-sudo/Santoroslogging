@@ -1,0 +1,62 @@
+<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGrad" cx="35%" cy="35%" r="80%">
+      <stop offset="0%" stop-color="#1a3a24"/>
+      <stop offset="100%" stop-color="#0b1a11"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="800" height="600" fill="url(#bgGrad)"/>
+
+  <!-- Topographic contour lines -->
+  <g fill="none" stroke="#b8862f" stroke-width="1.6" opacity="0.55">
+    <path d="M 90 460 C 180 380, 260 400, 320 350 C 390 290, 460 300, 540 250 C 610 205, 680 215, 740 170"/>
+  </g>
+  <g fill="none" stroke="#b8862f" stroke-width="1.6" opacity="0.4">
+    <path d="M 60 500 C 160 430, 250 445, 330 395 C 410 340, 480 345, 560 295 C 630 250, 690 255, 760 215"/>
+  </g>
+  <g fill="none" stroke="#b8862f" stroke-width="1.6" opacity="0.28">
+    <path d="M 30 540 C 140 480, 240 490, 340 440 C 430 390, 500 390, 580 340 C 650 295, 700 295, 780 260"/>
+  </g>
+  <g fill="none" stroke="#d6a94f" stroke-width="1.4" opacity="0.2">
+    <path d="M 10 580 C 130 525, 235 535, 350 485 C 445 440, 515 435, 600 385 C 670 340, 715 335, 795 305"/>
+  </g>
+
+  <!-- Parcel boundary -->
+  <polygon points="150,470 260,300 470,220 640,300 590,470 320,530"
+    fill="#b8862f" fill-opacity="0.06" stroke="#d6a94f" stroke-width="2.5"
+    stroke-dasharray="10 8" stroke-linejoin="round"/>
+
+  <!-- Boundary corner markers -->
+  <g fill="#d6a94f">
+    <circle cx="150" cy="470" r="5"/>
+    <circle cx="260" cy="300" r="5"/>
+    <circle cx="470" cy="220" r="5"/>
+    <circle cx="640" cy="300" r="5"/>
+    <circle cx="590" cy="470" r="5"/>
+    <circle cx="320" cy="530" r="5"/>
+  </g>
+
+  <!-- Simple pine cluster inside the parcel, marking stand locations -->
+  <g fill="#4a3826" opacity="0.85">
+    <path d="M 340 400 l 16 -34 l 16 34 z"/>
+    <path d="M 356 386 l 14 -30 l 14 30 z"/>
+    <rect x="352" y="400" width="8" height="14"/>
+  </g>
+  <g fill="#4a3826" opacity="0.7">
+    <path d="M 470 360 l 14 -30 l 14 30 z"/>
+    <path d="M 484 348 l 12 -26 l 12 26 z"/>
+    <rect x="480" y="360" width="7" height="12"/>
+  </g>
+  <g fill="#4a3826" opacity="0.6">
+    <path d="M 420 440 l 12 -26 l 12 26 z"/>
+    <rect x="428" y="440" width="6" height="10"/>
+  </g>
+
+  <!-- Compass rose -->
+  <g transform="translate(690,110)" stroke="#e7e9df" fill="#e7e9df">
+    <circle r="34" fill="none" stroke="#d6a94f" stroke-width="1.5" opacity="0.7"/>
+    <path d="M0,-26 L7,0 L0,26 L-7,0 Z" opacity="0.9"/>
+    <path d="M-26,0 L0,-7 L26,0 L0,7 Z" opacity="0.5"/>
+    <text x="0" y="-40" text-anchor="middle" font-family="Oswald, sans-serif" font-size="14" fill="#d6a94f" stroke="none" letter-spacing="1">N</text>
+  </g>
+</svg>

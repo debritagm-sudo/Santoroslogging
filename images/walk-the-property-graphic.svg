@@ -1,0 +1,52 @@
+<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGrad2" cx="40%" cy="30%" r="85%">
+      <stop offset="0%" stop-color="#1a3a24"/>
+      <stop offset="100%" stop-color="#0b1a11"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="800" height="600" fill="url(#bgGrad2)"/>
+
+  <!-- Tree line silhouettes, back row -->
+  <g fill="#132a1a">
+    <path d="M40 380 l30 -70 l30 70 z"/>
+    <path d="M95 380 l26 -58 l26 58 z"/>
+    <path d="M690 370 l28 -62 l28 62 z"/>
+    <path d="M735 375 l24 -52 l24 52 z"/>
+    <path d="M620 385 l26 -56 l26 56 z"/>
+  </g>
+
+  <!-- Tree silhouettes, front row, flanking the trail -->
+  <g fill="#1c3d25">
+    <path d="M120 470 l38 -86 l38 86 z"/>
+    <path d="M180 480 l32 -72 l32 72 z"/>
+    <path d="M600 460 l36 -82 l36 82 z"/>
+    <path d="M660 475 l30 -68 l30 68 z"/>
+    <path d="M40 500 l30 -68 l30 68 z"/>
+    <path d="M720 495 l28 -64 l28 64 z"/>
+  </g>
+
+  <!-- Winding trail -->
+  <path d="M 380 60 C 340 140, 420 190, 380 260 C 340 330, 250 350, 260 430 C 268 490, 330 520, 320 570"
+    fill="none" stroke="#4a3826" stroke-width="46" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 380 60 C 340 140, 420 190, 380 260 C 340 330, 250 350, 260 430 C 268 490, 330 520, 320 570"
+    fill="none" stroke="#5c4530" stroke-width="34" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Trail centerline, dashed gold -->
+  <path d="M 380 60 C 340 140, 420 190, 380 260 C 340 330, 250 350, 260 430 C 268 490, 330 520, 320 570"
+    fill="none" stroke="#d6a94f" stroke-width="2.5" stroke-dasharray="3 14" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Boot prints along the trail -->
+  <g fill="#d6a94f" opacity="0.8">
+    <ellipse cx="368" cy="150" rx="9" ry="15" transform="rotate(-18 368 150)"/>
+    <ellipse cx="398" cy="185" rx="9" ry="15" transform="rotate(14 398 185)"/>
+    <ellipse cx="372" cy="290" rx="9" ry="15" transform="rotate(-10 372 290)"/>
+    <ellipse cx="330" cy="330" rx="9" ry="15" transform="rotate(22 330 330)"/>
+    <ellipse cx="278" cy="410" rx="9" ry="15" transform="rotate(-14 278 410)"/>
+    <ellipse cx="298" cy="470" rx="9" ry="15" transform="rotate(10 298 470)"/>
+  </g>
+
+  <!-- Sun / clearing glow at the top of the trail -->
+  <circle cx="380" cy="60" r="46" fill="#d6a94f" opacity="0.12"/>
+  <circle cx="380" cy="60" r="20" fill="#d6a94f" opacity="0.22"/>
+</svg>
