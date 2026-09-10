@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Santoro's Logging | Timber Harvesting &amp; Forest Management, Cherry Valley NY</title>
+<meta name="description" content="Professional timber harvesting and forest management in Cherry Valley, NY. Wildlife habitat cuts, revenue timber harvests, and viewshed cuts, planned around your land.">
+<link rel="icon" type="image/png" href="images/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --green-950:#0b1a11;
+    --green-900:#0f2418;
+    --green-800:#16341f;
+    --green-700:#204a2b;
+    --green-600:#2c5f39;
+    --gold:#b8862f;
+    --gold-light:#d6a94f;
+    --paper:#e7e9df;
+    --paper-2:#dcded1;
+    --ink:#171913;
+    --ink-soft:#3a3d34;
+    --bark:#4a3826;
+    --white:#f8f7f1;
+    --max:1180px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Source Serif 4', Georgia, serif;
+    font-size:17px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4,.display{
+    font-family:'Oswald', Impact, sans-serif;
+    text-transform:uppercase;
+    font-weight:600;
+    letter-spacing:0.01em;
+    line-height:1.05;
+    color:var(--ink);
+    margin:0;
+  }
+  a{color:inherit;}
+  img{display:block;max-width:100%;}
+  .wrap{max-width:var(--max);margin:0 auto;padding:0 28px;}
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    font-family:'Oswald',sans-serif;
+    text-transform:uppercase;
+    font-weight:600;
+    letter-spacing:0.04em;
+    font-size:15px;
+    padding:14px 26px;
+    text-decoration:none;
+    border:2px solid var(--gold);
+    color:var(--white);
+    background:transparent;
+    transition:background .2s ease, color .2s ease;
+  }
+  .btn:hover{background:var(--gold);color:var(--green-950);}
+  .btn.solid{background:var(--gold);color:var(--green-950);}
+  .btn.solid:hover{background:var(--gold-light);}
+  .btn.dark{border-color:var(--green-800);color:var(--green-900);}
+  .btn.dark:hover{background:var(--green-800);color:var(--white);}
+
+  /* ---------- NAV ---------- */
+  header.site{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    background:rgba(11,26,17,0.92);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid rgba(184,134,47,0.25);
+  }
+  .navbar{
+    max-width:var(--max);margin:0 auto;padding:12px 28px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;}
+  .brand img{height:58px;width:auto;}
+  .brand-text{color:var(--white);font-family:'Oswald',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.03em;}
+  .brand-text span{display:block;font-family:'Source Serif 4',serif;text-transform:none;font-weight:400;font-size:11.5px;color:var(--gold-light);letter-spacing:0.03em;}
+  nav.links{display:flex;align-items:center;gap:28px;}
+  nav.links a{
+    color:var(--white);text-decoration:none;font-family:'Oswald',sans-serif;
+    font-size:13.5px;text-transform:uppercase;letter-spacing:0.06em;font-weight:500;
+    opacity:0.88;margin-right:26px;
+  }
+  nav.links a:last-child{margin-right:0;}
+  nav.links a:hover{color:var(--gold-light);opacity:1;}
+  .nav-phone{
+    color:var(--gold-light);font-family:'Oswald',sans-serif;font-weight:600;
+    letter-spacing:0.02em;text-decoration:none;font-size:15px;white-space:nowrap;
+  }
+  .nav-toggle{display:none;background:none;border:none;color:var(--white);font-size:26px;cursor:pointer;padding:4px 8px;}
+
+  @media (max-width:860px){
+    nav.links{
+      position:fixed;top:69px;left:0;right:0;background:var(--green-950);
+      flex-direction:column;align-items:flex-start;gap:0;
+      max-height:0;overflow:hidden;transition:max-height .3s ease;
+      border-bottom:1px solid rgba(184,134,47,0.25);
+    }
+    nav.links.open{max-height:400px;}
+    nav.links a{padding:16px 28px;width:100%;border-top:1px solid rgba(255,255,255,0.08);}
+    .nav-toggle{display:block;}
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:relative;height:92vh;min-height:560px;
+    display:flex;align-items:flex-end;
+    background-color:#000;
+    background-image:url('images/logs-landing-hillside.jpg');
+    background-repeat:no-repeat;
+    background-position:22% 42%;
+    background-size:cover;
+  }
+  .hero > img{display:none;}
+  .hero::after{
+    content:'';position:absolute;inset:0;
+    background:
+      linear-gradient(0deg, rgba(7,16,11,0.97) 20%, rgba(7,16,11,0.72) 52%, rgba(7,16,11,0.3) 78%),
+      linear-gradient(100deg, rgba(5,12,8,0.85) 0%, rgba(5,12,8,0.5) 42%, rgba(5,12,8,0) 66%);
+  }
+  .hero h1, .hero p.lede{text-shadow:0 2px 14px rgba(0,0,0,0.45);}
+  .hero-inner{position:relative;z-index:2;max-width:var(--max);margin:0 auto;padding:0 28px 68px;width:100%;}
+  .hero-eyebrow{
+    color:var(--gold-light);font-family:'Oswald',sans-serif;font-size:14px;
+    letter-spacing:0.14em;text-transform:uppercase;margin-bottom:18px;font-weight:500;
+  }
+  .hero-logo{height:120px;width:auto;margin-bottom:26px;}
+  .hero h1{
+    color:var(--white);font-size:clamp(34px,6vw,64px);max-width:15ch;margin-bottom:22px;
+  }
+  .hero p.lede{
+    color:#e9e7dc;font-family:'Source Serif 4',serif;font-size:19px;max-width:46ch;
+    margin-bottom:34px;font-style:italic;
+  }
+  .hero-actions{display:flex;gap:18px;flex-wrap:wrap;}
+
+  /* ---------- SECTION generic ---------- */
+  section{padding:96px 0;}
+  .section-head{max-width:640px;margin-bottom:52px;}
+  .kicker{
+    font-family:'Oswald',sans-serif;color:var(--gold);font-size:13.5px;
+    letter-spacing:0.12em;text-transform:uppercase;font-weight:600;margin-bottom:14px;display:block;
+  }
+  .section-logo{height:68px;width:auto;margin-bottom:18px;}
+  .section-logo.dark-bg{filter:brightness(0) invert(1);opacity:0.9;}
+  .section-logo.section-logo-lg{height:120px;}
+  h2.title{font-size:clamp(28px,4vw,42px);}
+  p.lead-text{font-size:19px;color:var(--ink-soft);margin-top:16px;max-width:56ch;}
+
+  /* ---------- INTRO ---------- */
+  .intro{background:var(--paper);}
+  .intro-grid{display:grid;grid-template-columns:1fr 1.15fr;gap:64px;align-items:center;}
+  .intro-copy p{font-size:19px;color:var(--ink-soft);margin:0 0 20px;}
+  .intro-logo{height:72px;width:auto;margin-bottom:20px;}
+  .intro-copy p:first-child{font-size:23px;color:var(--ink);font-style:italic;}
+  .intro-photo{position:relative;}
+  .intro-photo img{width:100%;height:560px;object-fit:cover;}
+  .intro-photo .cap{
+    position:absolute;bottom:0;left:0;right:0;padding:14px 18px;
+    background:rgba(11,26,17,0.82);color:var(--paper);font-family:'Oswald',sans-serif;
+    font-size:12.5px;letter-spacing:0.06em;text-transform:uppercase;
+  }
+  @media (max-width:860px){
+    .intro-grid{grid-template-columns:1fr;gap:36px;}
+    .intro-photo img{height:380px;}
+  }
+
+  /* ---------- SERVICES ---------- */
+  .services{background:var(--green-950);color:var(--paper);}
+  .services .kicker{color:var(--gold-light);}
+  .services h2.title{color:var(--white);}
+  .services p.lead-text{color:#c9cdbf;}
+  .service-list{display:flex;flex-direction:column;border-top:1px solid rgba(231,233,223,0.16);}
+  .service-row{
+    display:grid;grid-template-columns:1.1fr 2fr;gap:40px;
+    padding:38px 0;border-bottom:1px solid rgba(231,233,223,0.16);
+  }
+  .service-row h3{color:var(--gold-light);font-size:26px;}
+  .service-row p{color:#d7d9cb;font-size:17.5px;margin:0;max-width:60ch;}
+  @media (max-width:760px){
+    .service-row{grid-template-columns:1fr;gap:12px;}
+  }
+  .services-foot{margin-top:34px;color:#c9cdbf;font-style:italic;font-size:18px;max-width:60ch;}
+
+  /* ---------- PROCESS ---------- */
+  .process{background:var(--paper);}
+  .process-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;}
+  .process-card{display:flex;flex-direction:column;}
+  .process-card-img{position:relative;aspect-ratio:4/3;overflow:hidden;margin-bottom:16px;background:var(--green-950);}
+  .process-card-img img{width:100%;height:100%;object-fit:cover;display:block;}
+  .process-card .num{
+    font-family:'Oswald',sans-serif;font-size:15px;color:var(--gold);font-weight:700;
+    letter-spacing:0.06em;margin-bottom:10px;
+  }
+  .process-card h4{font-size:19px;margin-bottom:10px;}
+  .process-card p{font-size:15.5px;color:var(--ink-soft);margin:0;}
+  @media (max-width:900px){.process-grid{grid-template-columns:1fr 1fr;}}
+  @media (max-width:560px){.process-grid{grid-template-columns:1fr;}}
+
+  /* ---------- CREW ---------- */
+  .crew{background:var(--green-900);padding:0;}
+  .crew-photo{
+    position:relative;aspect-ratio:4/3;overflow:hidden;
+    background-color:var(--green-950);
+    background-image:url('images/crew-team-photo.jpg');
+    background-repeat:no-repeat;background-position:center;background-size:contain;
+  }
+  .crew-photo::after{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(0deg, rgba(6,14,9,0.94) 0%, rgba(6,14,9,0.6) 32%, rgba(6,14,9,0.18) 60%, rgba(6,14,9,0.3) 100%);
+  }
+  .crew-caption{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:flex-end;padding:44px 0;}
+  .crew-caption .kicker{color:var(--gold-light);}
+  .crew-caption h2{color:var(--white);font-size:clamp(24px,3.4vw,36px);max-width:20ch;text-shadow:0 2px 10px rgba(0,0,0,0.5);}
+  .crew-caption p{color:#e3e5da;font-size:17px;max-width:56ch;margin-top:12px;text-shadow:0 1px 8px rgba(0,0,0,0.5);}
+  .crew-section-logo{filter:brightness(0) invert(1);opacity:0.92;}
+
+  /* ---------- CALLOUT ---------- */
+  .callout{background:var(--bark);color:var(--white);position:relative;overflow:hidden;}
+  .callout .bg{
+    position:absolute;inset:0;background-image:url('images/forwarder-cornfield.jpg');
+    background-size:cover;background-position:center 60%;opacity:0.28;
+  }
+  .callout-logo{
+    position:absolute;right:-20px;bottom:-50px;height:420px;width:auto;
+    opacity:0.18;z-index:1;pointer-events:none;
+  }
+  .callout .wrap{position:relative;z-index:2;max-width:900px;}
+  .callout .kicker{color:var(--gold-light);}
+  .callout blockquote{
+    margin:0 0 24px;font-family:'Oswald',sans-serif;text-transform:none;
+    font-size:clamp(24px,3.2vw,34px);line-height:1.25;font-weight:500;
+    color:var(--white);
+  }
+  .callout p{font-size:18px;color:#e6dcc9;max-width:64ch;margin:0;}
+
+  /* ---------- PLANNING ---------- */
+  .planning{background:var(--paper-2);}
+  .planning-grid{display:grid;grid-template-columns:0.9fr 1.4fr;gap:56px;align-items:center;}
+  .planning-card{
+    background:var(--green-900);color:var(--white);padding:38px 34px;
+  }
+  .planning-card .planning-logo{height:80px;width:auto;margin-bottom:18px;}
+  .planning-card h3{font-size:26px;color:var(--white);margin-bottom:18px;}
+  .planning-card .contact-line{display:block;font-family:'Source Serif 4',serif;font-size:16.5px;color:#dfe0d3;margin-bottom:6px;}
+  .planning-card .contact-line a{color:var(--gold-light);text-decoration:none;}
+  .planning-copy p{font-size:19px;color:var(--ink-soft);margin:0 0 18px;}
+  @media (max-width:860px){.planning-grid{grid-template-columns:1fr;gap:32px;}}
+
+  /* ---------- GALLERY ---------- */
+  .gallery{background:var(--green-950);}
+  .gallery .kicker{color:var(--gold-light);}
+  .gallery h2.title{color:var(--white);}
+  .gallery p.lead-text{color:#c9cdbf;}
+  .masonry{
+    column-count:3;column-gap:14px;margin-top:20px;
+  }
+  .masonry figure{margin:0 0 14px;break-inside:avoid;position:relative;overflow:hidden;}
+  .masonry img{width:100%;height:auto;display:block;}
+  .masonry figcaption{
+    padding:10px 4px 0;color:#b9bcae;font-family:'Oswald',sans-serif;
+    font-size:11.5px;text-transform:uppercase;letter-spacing:0.05em;
+  }
+  @media (max-width:860px){.masonry{column-count:2;}}
+  @media (max-width:520px){.masonry{column-count:1;}}
+
+  /* ---------- CONTACT / FOOTER ---------- */
+  footer.site{background:var(--green-950);color:var(--paper);border-top:1px solid rgba(184,134,47,0.3);}
+  .footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:48px;padding:72px 0 40px;}
+  .footer-brand{display:flex;flex-direction:column;align-items:flex-start;gap:14px;}
+  .footer-brand img{height:92px;width:auto;max-width:300px;object-fit:contain;flex-shrink:0;}
+  .footer-brand p{color:#b9bcae;font-size:15.5px;max-width:32ch;margin:0;}
+  .footer-col h4{color:var(--gold-light);font-size:14px;letter-spacing:0.08em;margin-bottom:16px;}
+  .footer-col p, .footer-col a{
+    display:block;color:#d7d9cb;text-decoration:none;font-size:16px;margin-bottom:6px;
+  }
+  .footer-col a:hover{color:var(--gold-light);}
+  .footer-bottom{
+    border-top:1px solid rgba(231,233,223,0.14);padding:22px 0;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    color:#8b8f80;font-size:13px;font-family:'Oswald',sans-serif;letter-spacing:0.03em;
+  }
+  @media (max-width:760px){.footer-grid{grid-template-columns:1fr;gap:36px;padding:56px 0 30px;}}
+
+  section#contact{padding-top:96px;padding-bottom:96px;background:var(--green-900);}
+  .contact-logo{height:108px;width:auto;margin-bottom:18px;}
+  .contact-banner{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:24px;
+    color:var(--white);
+  }
+  .contact-banner h2{font-size:clamp(26px,4vw,40px);color:var(--white);max-width:14ch;}
+  .contact-banner .sub{color:#c9cdbf;font-size:17px;margin-top:10px;max-width:40ch;}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="navbar">
+    <a class="brand" href="#top">
+      <img src="images/logo-transparent.png" alt="Santoro's Logging logo">
+      <span class="brand-text">Santoro's Logging<span>Timber Harvesting &amp; Forest Management</span></span>
+    </a>
+    <nav class="links" id="navLinks">
+      <a href="#services">Services</a>
+      <a href="#process">How It Works</a>
+      <a href="#crew">Our Crew</a>
+      <a href="#planning">Planning</a>
+      <a href="#gallery">Our Work</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:18px;">
+      <a class="nav-phone" href="tel:6074375090">(607) 437-5090</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">&#9776;</button>
+    </div>
+  </div>
+</header>
+
+<div id="top"></div>
+<section class="hero" role="img" aria-label="Stacked hardwood logs on a landing, cut on a hillside harvest in Central New York">
+  <div class="hero-inner">
+    <img src="images/logo-transparent.png" alt="Santoro's Logging" class="hero-logo">
+    <span class="hero-eyebrow">Cherry Valley, New York</span>
+    <h1>We don't run one kind of harvest.<br>We run yours.</h1>
+    <p class="lede">Professional timber harvesting for landowners across Central New York.</p>
+    <div class="hero-actions">
+      <a class="btn solid" href="tel:6074375090">Call (607) 437-5090</a>
+      <a class="btn" href="#planning">Get a Free Site Visit</a>
+    </div>
+  </div>
+</section>
+
+<section class="intro">
+  <div class="wrap intro-grid">
+    <div class="intro-copy">
+      <img src="images/logo-triangle.png" alt="" class="intro-logo">
+      <p>Every property is different, and so is every landowner.</p>
+      <p>Some people want a harvest that improves wildlife habitat. Some want to generate income from mature timber. Some just want to open up a view. Most want some mix of it all.</p>
+      <p>Santoro's Logging doesn't work from a single template. We sit down with you first, walk the property, and build a harvest plan around what you actually want for your land.</p>
+    </div>
+    <div class="intro-photo">
+      <img src="images/log-yard-barn.jpg" alt="Sorted log piles at a landing near a barn, upstate New York timber harvest">
+      <div class="cap">Sorted landing &middot; Cherry Valley area</div>
+    </div>
+  </div>
+</section>
+
+<section class="services" id="services">
+  <div class="wrap">
+    <div class="section-head">
+      <img src="images/logo-sawblade.png" alt="" class="section-logo dark-bg">
+      <span class="kicker">What We Plan For</span>
+      <h2 class="title">Three reasons landowners call us</h2>
+      <p class="lead-text">Most projects are a blend of these &mdash; that's exactly how we plan them, together, before a saw ever starts.</p>
+    </div>
+    <div class="service-list">
+      <div class="service-row">
+        <h3>Wildlife Habitat Cuts</h3>
+        <p>Opening the canopy to bring browse, mast, and cover back down to the forest floor &mdash; built around the game you hunt and the habitat you want to see thrive for the next twenty years.</p>
+      </div>
+      <div class="service-row">
+        <h3>Revenue Timber Harvests</h3>
+        <p>Mature, marketable timber converted into income, harvested and hauled with care for the trees, soil, and access left behind.</p>
+      </div>
+      <div class="service-row">
+        <h3>Viewshed Cuts</h3>
+        <p>Selective removal that opens up the view you're after &mdash; a ridge, a pond, a valley &mdash; without stripping a hillside bare.</p>
+      </div>
+    </div>
+    <p class="services-foot">There's no cost and no obligation to find out which one fits your land. That conversation happens before anything else does.</p>
+  </div>
+</section>
+
+<section class="process" id="process">
+  <div class="wrap">
+    <div class="section-head">
+      <img src="images/logo-truck.png" alt="" class="section-logo section-logo-lg">
+      <span class="kicker">From First Call to Last Truckload</span>
+      <h2 class="title">How a harvest actually happens</h2>
+    </div>
+    <div class="process-grid">
+      <div class="process-card">
+        <div class="process-card-img">
+          <img src="images/walk-the-property-graphic.svg" alt="Illustration of a winding trail through the woods">
+        </div>
+        <div class="num">01</div>
+        <h4>Walk the Property</h4>
+        <p>We walk your land with you and talk through what you want it to do for you next.</p>
+      </div>
+      <div class="process-card">
+        <div class="process-card-img">
+          <img src="images/build-the-plan-graphic.svg" alt="Illustration of a property boundary marked over a topographic map">
+        </div>
+        <div class="num">02</div>
+        <h4>Build the Plan</h4>
+        <p>A harvest plan is built around your goals, not a standard template &mdash; covering what comes out and what stays.</p>
+      </div>
+      <div class="process-card">
+        <div class="process-card-img">
+          <img src="images/road-build-dozer.jpg" alt="Bulldozer building a haul road into a timber harvest site">
+        </div>
+        <div class="num">03</div>
+        <h4>Crew and Equipment Move In</h4>
+        <p>Access roads go in first, built to protect the site, then harvesting and hauling begin.</p>
+      </div>
+      <div class="process-card">
+        <div class="process-card-img">
+          <img src="images/log-truck-snow.jpg" alt="Loaded log truck hauling timber out on a winter harvest">
+        </div>
+        <div class="num">04</div>
+        <h4>Trucks Roll, You Get Paid</h4>
+        <p>Timber moves out to mills across the region, and you're paid for what's harvested.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="crew" id="crew" role="img" aria-label="The Santoro's Logging crew standing in front of a harvester at a local equipment show">
+  <div class="crew-photo">
+    <div class="crew-caption">
+      <div class="wrap">
+        <img src="images/logo-pines.png" alt="" class="section-logo crew-section-logo">
+        <span class="kicker">Who Shows Up</span>
+        <h2>A local crew, on well-kept equipment</h2>
+        <p>The same crew and machines you see here are who shows up on your property &mdash; not a rotating cast of subcontractors.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="callout">
+  <div class="bg"></div>
+  <img src="images/logo-pines.png" alt="" class="callout-logo">
+  <div class="wrap">
+    <span class="kicker">Working Nearby? Let's Talk.</span>
+    <blockquote>If we're already working near you, your project starts with a head start.</blockquote>
+    <p>Access roads, equipment mobilization, and setup make up a real share of any harvest's cost. When our crew is already at work on a property nearby, a neighboring landowner's project can often be coordinated alongside it &mdash; lowering those costs from the start.</p>
+  </div>
+</section>
+
+<section class="planning" id="planning">
+  <div class="wrap planning-grid">
+    <div class="planning-card">
+      <img src="images/logo-rounds.png" alt="" class="planning-logo">
+      <h3>Santoro's Logging</h3>
+      <span class="contact-line"><a href="tel:6074375090">(607) 437-5090</a></span>
+    </div>
+    <div class="planning-copy">
+      <p>Before any work begins, we walk the property with you and talk through your goals &mdash; wildlife habitat, income, a view, or some mix of the three.</p>
+      <p>We build a harvest plan around that conversation and stay involved through the work itself. There's no cost and no obligation to have that conversation.</p>
+      <a class="btn dark" href="tel:6074375090">Call (607) 437-5090</a>
+    </div>
+  </div>
+</section>
+
+<section class="gallery" id="gallery">
+  <div class="wrap">
+    <div class="section-head">
+      <img src="images/logo-triangle.png" alt="" class="section-logo dark-bg">
+      <span class="kicker">Recent Work</span>
+      <h2 class="title">A look at the woods we've been in</h2>
+      <p class="lead-text">Real projects, real ground, every season &mdash; from road-building to the last truck out.</p>
+    </div>
+    <div class="masonry">
+      <figure>
+        <img src="images/harvester-closeup.jpg" alt="Processor in a field before moving to a new project">
+        <figcaption>Processor ready to start a new project</figcaption>
+      </figure>
+      <figure>
+        <img src="images/landing-valley-view.jpg" alt="View from inside a harvester cab looking out at a sorted log pile with a valley and hillside in the background">
+        <figcaption>The view from the cab</figcaption>
+      </figure>
+      <figure>
+        <img src="images/harvester-head-grip.jpg" alt="Harvester head gripping a log in the woods">
+        <figcaption>Handling a fresh cut</figcaption>
+      </figure>
+      <figure>
+        <img src="images/road-built-1.jpg" alt="Wide, well-built forest road climbing a hillside">
+        <figcaption>Built to hold up</figcaption>
+      </figure>
+      <figure>
+        <img src="images/feller-buncher-cutting.jpg" alt="Track harvester felling a tree on a hillside timber harvest">
+        <figcaption>Felling &amp; Bunching</figcaption>
+      </figure>
+      <figure>
+        <img src="images/bucked-hardwood-logs.jpg" alt="Freshly bucked hardwood logs staged in the woods">
+        <figcaption>Bucked &amp; ready</figcaption>
+      </figure>
+      <figure>
+        <img src="images/harvester-forwarder-winter.jpg" alt="Harvester and forwarder working a winter timber harvest in the snow">
+        <figcaption>Working through winter</figcaption>
+      </figure>
+      <figure>
+        <img src="images/forwarder-loaded-forest.jpg" alt="Forwarder loaded with logs in the forest with another machine working ahead">
+        <figcaption>Loaded in the woods</figcaption>
+      </figure>
+      <figure>
+        <img src="images/lowboy-transport.jpg" alt="Equipment loaded on a lowboy trailer for transport between projects">
+        <figcaption>Moving equipment between projects</figcaption>
+      </figure>
+      <figure>
+        <img src="images/winter-yard-machines.jpg" alt="Equipment staged at a snowy log landing">
+        <figcaption>Staged at the landing</figcaption>
+      </figure>
+      <figure>
+        <img src="images/log-truck-loaded.jpg" alt="A fully loaded log truck ready to haul out">
+        <figcaption>Loaded out</figcaption>
+      </figure>
+      <figure>
+        <img src="images/cab-following-forwarder.jpg" alt="View from a cab following a loaded forwarder down a snowy woods road">
+        <figcaption>Following the load</figcaption>
+      </figure>
+      <figure>
+        <img src="images/worker-felled-log.jpg" alt="A worker in safety gear standing beside a large felled hardwood log">
+        <figcaption>On the ground</figcaption>
+      </figure>
+      <figure>
+        <img src="images/log-truck-fall.jpg" alt="Loaded log truck on a rural road in autumn">
+        <figcaption>Hauling out</figcaption>
+      </figure>
+      <figure>
+        <img src="images/forwarder-dusk.jpg" alt="Forwarder loaded with logs in the snow at dusk">
+        <figcaption>Winter logging</figcaption>
+      </figure>
+      <figure>
+        <img src="images/cab-grapple-closeup.jpg" alt="Close-up of a harvester grapple head holding a log">
+        <figcaption>A harvest in full swing</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="wrap contact-banner">
+    <div>
+      <img src="images/logo-truck.png" alt="" class="contact-logo">
+      <h2>Thinking about a harvest of your own?</h2>
+      <p class="sub">There's no cost and no obligation to find out what your land is ready for.</p>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <a class="btn solid" href="tel:6074375090">Call (607) 437-5090</a>
+      <a class="btn" href="#planning">Get a Free Site Visit</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <img src="images/logo-transparent.png" alt="Santoro's Logging logo">
+      <p>Professional timber harvesting and forest management, planned around your land and your goals.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Santoro's Logging</h4>
+      <p>3828 County Highway 33<br>Cherry Valley, NY 13320</p>
+      <a href="tel:6074375090">(607) 437-5090</a>
+      <p style="margin-top:10px;color:#8b8f80;">Joseph A. Santoro III, Owner</p>
+    </div>
+    <div class="footer-col">
+      <h4>Quick Links</h4>
+      <a href="#services">Services</a>
+      <a href="#process">How It Works</a>
+      <a href="#crew">Our Crew</a>
+      <a href="#gallery">Our Work</a>
+    </div>
+  </div>
+  <div class="wrap footer-bottom">
+    <span>&copy; 2026 Santoro's Logging. All rights reserved.</span>
+    <span>Cherry Valley, New York</span>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('navToggle').addEventListener('click', function(){
+    document.getElementById('navLinks').classList.toggle('open');
+  });
+  document.querySelectorAll('nav.links a').forEach(function(a){
+    a.addEventListener('click', function(){
+      document.getElementById('navLinks').classList.remove('open');
+    });
+  });
+</script>
+
+</body>
+</html>
