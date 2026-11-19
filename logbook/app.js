@@ -394,17 +394,33 @@ function viewDashboard() {
   const hasDrivers = drivers.length || db.users.some((u) => crewType(u) === 'driver' && u.active !== false);
   const rows = Object.values(per).sort((a, b) => b.hours - a.hours);
   const otRows = rows.filter((r) => r.ot > 0).sort((a, b) => b.ot - a.ot);
-  const total = sum(recent, (e) => e.hours), totalOT = sum(recent, (e) => OT.get(e.id));
+  // Split by the person's job type (a logger's or driver's hours, whatever they were logged to).
+  const byType = (type) => recent.filter((e) => crewType(userById(e.userId)) === type);
+  const logH = sum(byType('logger'), (e) => e.hours), logOT = sum(byType('logger'), (e) => OT.get(e.id));
+  const drvH = sum(byType('driver'), (e) => e.hours), drvOT = sum(byType('driver'), (e) => OT.get(e.id));
+  const total = logH + drvH, totalOT = logOT + drvOT;
   const maxH = Math.max(1, ...rows.map((r) => r.hours));
   const maxOT = Math.max(1, ...otRows.map((r) => r.ot));
+  const tile = (label, value, small, cls = '') => `<div class="stat ${cls}"><span>${label}</span><b>${fmtHrs(value)}</b><small>${small}</small></div>`;
   return `
     <div class="page-head"><div><h1>Dashboard</h1><p class="muted">Last 7 days · ${fmtShort(start)} – ${fmtShort(end)}</p></div></div>
-    <section class="stats-row four">
-      <div class="stat"><span>Hours</span><b>${fmtHrs(total)}</b><small>${hasDrivers ? 'loggers + drivers' : 'all projects'}</small></div>
-      <div class="stat ${totalOT > 0 ? 'warn' : ''}"><span>Overtime</span><b>${fmtHrs(totalOT)}</b><small>hrs</small></div>
-      <div class="stat"><span>On the clock</span><b>${live.length}</b><small>right now</small></div>
-      <div class="stat"><span>Projects</span><b>${rows.length}</b><small>with hours</small></div>
-    </section>
+    <div class="stat-group">
+      <h3>Hours</h3>
+      <section class="stats-row three">
+        ${tile('Loggers', logH, 'hrs')}
+        ${tile('Drivers', drvH, 'hrs')}
+        ${tile('Total', total, 'hrs', 'sum')}
+      </section>
+    </div>
+    <div class="stat-group">
+      <h3>Overtime</h3>
+      <section class="stats-row three">
+        ${tile('Loggers', logOT, 'hrs OT', logOT > 0 ? 'warn' : '')}
+        ${tile('Drivers', drvOT, 'hrs OT', drvOT > 0 ? 'warn' : '')}
+        ${tile('Total', totalOT, 'hrs OT', `sum ${totalOT > 0 ? 'warn' : ''}`)}
+      </section>
+    </div>
+    <p class="muted small" style="margin:-4px 2px 0">${live.length ? `<b>${live.length}</b> on the clock right now (see below)` : 'Nobody is on the clock right now.'}</p>
     <div class="dash-grid">
       <section class="card">
         <div class="card-head"><h3>Hours by project</h3><span class="muted small">Tap a project for details</span></div>
@@ -659,6 +675,11 @@ function viewSettings() {
   const s = db.settings;
   return `
     <div class="page-head"><div><h1>Settings</h1></div></div>
+    <section class="card settings-section">
+      <h3>Appearance</h3>
+      ${themeSwitch()}
+      <p class="muted small">Dark mode is easier on the eyes early in the morning and at night. This setting is saved on this phone only.</p>
+    </section>
     <form class="card settings-section" id="settings-form">
       <h3>Overtime rules</h3>
       <p class="muted small" style="margin-bottom:-4px"><b>Loggers</b></p>
@@ -707,6 +728,44 @@ function toast(msg, kind = '') {
 }
 
 // ---------- Add / edit hours ----------
+// Simple time picker: hour (1-12), minutes (:00 :15 :30 :45), AM/PM.
+// A hidden input carries the 24-hour "HH:MM" value the rest of the form reads.
+function timePicker(name, value) {
+  let h = '', m = '00', ap = name === 'end' ? 'PM' : 'AM';
+  if (value) {
+    const mins = toMin(roundTime(value)), H = Math.floor(mins / 60);
+    h = String(H % 12 || 12); m = pad(mins % 60); ap = H >= 12 ? 'PM' : 'AM';
+  }
+  const label = name === 'end' ? 'End' : 'Start';
+  return `<div class="tp" data-picker="time">
+    <select data-part="h" aria-label="${label} hour"><option value="">Hour</option>${[...Array(12)].map((_, i) => `<option value="${i + 1}" ${String(i + 1) === h ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>
+    <select data-part="m" aria-label="${label} minutes">${['00', '15', '30', '45'].map((v) => `<option value="${v}" ${v === m ? 'selected' : ''}>:${v}</option>`).join('')}</select>
+    <select data-part="ap" aria-label="${label} AM or PM">${['AM', 'PM'].map((v) => `<option value="${v}" ${v === ap ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <input type="hidden" name="${name}" value="${value ? roundTime(value) : ''}">
+  </div>`;
+}
+// Total hours picker: whole hours + :00 / :15 / :30 / :45.
+function hoursPicker(value) {
+  const v = roundHours(Number(value) || 0);
+  const h = v > 0 ? Math.floor(v) : '', q = v > 0 ? Math.round((v - Math.floor(v)) * 60) : 0;
+  return `<div class="tp tp-hours" data-picker="hours">
+    <select data-part="h" aria-label="Hours"><option value="">Hours</option>${[...Array(25)].map((_, i) => `<option value="${i}" ${h === i ? 'selected' : ''}>${i} hr</option>`).join('')}</select>
+    <select data-part="m" aria-label="Minutes">${[0, 15, 30, 45].map((n) => `<option value="${n}" ${n === q ? 'selected' : ''}>${n} min</option>`).join('')}</select>
+    <input type="hidden" name="hours" value="${v > 0 ? v : ''}">
+  </div>`;
+}
+function syncPicker(el) {
+  const part = (p) => el.querySelector(`[data-part="${p}"]`)?.value;
+  const out = el.querySelector('input[type="hidden"]');
+  if (el.dataset.picker === 'time') {
+    const h = part('h');
+    out.value = h ? `${pad((Number(h) % 12) + (part('ap') === 'PM' ? 12 : 0))}:${part('m')}` : '';
+  } else {
+    const h = part('h');
+    out.value = h === '' ? '' : Math.min(24, Number(h) + Number(part('m')) / 60);
+  }
+}
+
 function entryModal(entry, { userId } = {}) {
   const mgr = isManager();
   const e = entry || { userId: userId || db.me.id, projectId: lsGet('lastProject') || '', date: today(), start: '', end: '', hours: '', notes: '' };
@@ -730,11 +789,11 @@ function entryModal(entry, { userId } = {}) {
           <label><input type="radio" name="mode" value="times" ${mode === 'times' ? 'checked' : ''}>Start &amp; end time</label>
           <label><input type="radio" name="mode" value="hours" ${mode === 'hours' ? 'checked' : ''}>Total hours</label>
         </div>`}
-        <div class="mode-times row2">
-          <label class="field"><span>Start</span><input type="time" step="900" name="start" value="${e.start || ''}"></label>
-          <label class="field"><span>End</span><input type="time" step="900" name="end" value="${e.end || ''}"></label>
+        <div class="mode-times time-block">
+          <div class="field"><span>Start time</span>${timePicker('start', e.start)}</div>
+          <div class="field"><span>End time</span>${timePicker('end', e.end)}</div>
         </div>
-        <div class="mode-hours"><label class="field"><span>Hours worked</span><input type="number" name="hours" step="0.25" min="0.25" max="24" inputmode="decimal" value="${e.start ? '' : e.hours || ''}" placeholder="e.g. 8.5"></label></div>
+        <div class="mode-hours"><div class="field"><span>Hours worked</span>${hoursPicker(e.start ? 0 : e.hours)}</div></div>
         <label class="field"><span>Notes (optional)</span><input name="notes" maxlength="200" value="${esc(e.notes)}" placeholder="What you worked on"></label>
         <p class="preview" id="entry-preview"></p>
         <div class="form-error"></div>
@@ -757,7 +816,7 @@ function entryModal(entry, { userId } = {}) {
         txt = `${fmtTime(s)} to ${fmtTime(en)} = ${fmtHrs(h)} hrs${toMin(en) < toMin(s) ? ' (overnight)' : ''}`;
       } else if (m === 'hours' && f.get('hours')) {
         const h = roundHours(parseFloat(f.get('hours')));
-        if (h > 0) txt = `${fmtHrs(h)} hrs (rounded to the nearest 15 min)`;
+        if (h > 0) txt = `${fmtHrs(h)} hrs`;
       }
       $('#entry-preview', panel).textContent = txt;
     };
@@ -765,11 +824,10 @@ function entryModal(entry, { userId } = {}) {
       const t = ev.target;
       if (t.name === 'mode') form.dataset.mode = t.value;
       if (t.name === 'userId') form.querySelector('.project-field').hidden = isDriverId(t.value);
-      if (t.type === 'time' && t.value) t.value = roundTime(t.value);
-      if (t.name === 'hours' && t.value) t.value = roundHours(parseFloat(t.value)) || '';
+      const picker = t.closest('[data-picker]');
+      if (picker) syncPicker(picker);
       preview();
     });
-    form.addEventListener('input', preview);
     preview();
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
@@ -791,10 +849,10 @@ function entryModal(entry, { userId } = {}) {
       if (!mgr && (rec.date > today() || rec.date < minDate)) return formError(`You can only log hours for the last ${EDIT_WINDOW_DAYS} days.`);
       if (m === 'times') {
         const s = f.get('start'), en = f.get('end');
-        if (!s) return formError('Enter a start time.');
+        if (!s) return formError('Pick a start time.');
         rec.start = roundTime(s);
         if (!en) {
-          if (!entry?.active) return formError('Enter an end time.');
+          if (!entry?.active) return formError('Pick an end time.');
           Object.assign(rec, { end: null, hours: 0, active: true });
         } else {
           rec.end = roundTime(en);
@@ -804,7 +862,7 @@ function entryModal(entry, { userId } = {}) {
         }
       } else {
         const h = roundHours(parseFloat(f.get('hours')));
-        if (!(h > 0) || h > 24) return formError('Enter hours between 0.25 and 24.');
+        if (!(h > 0) || h > 24) return formError('Pick how many hours (up to 24).');
         Object.assign(rec, { start: null, end: null, hours: h, active: false });
       }
       if (!entry) { rec.createdAt = Date.now(); rec.method = 'manual'; rec.createdBy = db.me.id; }
@@ -926,11 +984,27 @@ function personModal(u) {
 }
 
 // ---------- Account ----------
+// ---------- Light / dark mode (saved per device) ----------
+const themePref = () => { const t = lsGet('theme'); return t === 'dark' || t === 'auto' ? t : 'light'; };
+function applyTheme(pref) {
+  document.documentElement.setAttribute('data-theme', pref);
+  const dark = pref === 'dark' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0a1a0f' : '#1d4a2a');
+}
+function themeSwitch() {
+  const cur = themePref();
+  return `<div class="seg" role="radiogroup" aria-label="Light or dark mode">${[['light', 'Light'], ['dark', 'Dark'], ['auto', 'Match phone']]
+    .map(([v, l]) => `<button type="button" role="radio" aria-checked="${cur === v}" class="${cur === v ? 'on' : ''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div>`;
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme(themePref()));
+applyTheme(themePref());
+
 function accountModal() {
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   openModal(`
     <div class="account-head"><span class="avatar">${esc(initials(db.me.name))}</span><div><h2 style="margin:0">${esc(db.me.name)}</h2><span class="muted">@${esc(db.me.username)} · ${isManager() ? 'Manager' : 'Employee'}</span></div></div>
+    <div class="field" style="margin-bottom:14px"><span>Appearance</span>${themeSwitch()}</div>
     <div class="menu-list">
       ${isManager() ? `<button class="btn btn-outline" data-act="go" data-to="#/hours">${ICON.list} My hours</button><button class="btn btn-outline" data-act="go" data-to="#/settings">${ICON.gear} Settings</button>` : ''}
       ${!standalone && ui.installEvt ? `<button class="btn btn-outline" data-act="install">${ICON.phone} Install app on this phone</button>` : ''}
@@ -1049,6 +1123,12 @@ const actions = {
   'close-modal': closeModal,
   'go': (el) => { closeModal(); location.hash = el.dataset.to; },
   'logout': async () => { closeModal(); ui.ts = null; ui.weekOffset = 0; await store.logout(); location.hash = ''; render(); },
+  'theme': (el) => {
+    lsSet('theme', el.dataset.v);
+    applyTheme(el.dataset.v);
+    // update any open switch (account menu) without closing it
+    document.querySelectorAll('[data-act="theme"]').forEach((b) => { const on = b.dataset.v === el.dataset.v; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+  },
   'install': async () => { closeModal(); ui.installEvt?.prompt(); ui.installEvt = null; },
   'week': (el) => { ui.weekOffset = Math.min(0, ui.weekOffset + Number(el.dataset.dir)); render(); },
   'ts-view': (el) => {
