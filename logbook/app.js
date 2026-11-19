@@ -47,7 +47,10 @@ const isManager = () => db.me?.role === 'manager';
 const userById = (id) => db.users.find((u) => u.id === id) || (id === db.me?.id ? db.me : null);
 const userName = (id) => userById(id)?.name || 'Unknown';
 const projectById = (id) => db.projects.find((p) => p.id === id);
-const projectName = (id) => projectById(id)?.name || 'Removed project';
+const projectName = (id) => (id ? projectById(id)?.name || 'Removed project' : 'Trucking');
+const crewType = (u) => (u?.crewType === 'driver' ? 'driver' : 'logger');
+const isDriverId = (id) => crewType(userById(id)) === 'driver';
+const CREW_LABEL = { logger: 'Logger', driver: 'Truck Driver' };
 const activeProjects = () => db.projects.filter((p) => p.active !== false).sort(byName);
 const timeRange = (e) => (e.start ? `${fmtTime(e.start)} – ${e.active ? 'now' : fmtTime(e.end)}` : 'Hours entered');
 
@@ -59,27 +62,31 @@ function canEdit(e) {
 // Overtime: daily threshold first (if set), then weekly threshold on the
 // remaining straight-time hours. Entries are processed in time order, so the
 // overtime lands on whichever project's hours pushed the person over.
+// Loggers use weeklyOT + dailyOT; truck drivers use driverWeeklyOT only.
 function computeOT(entries, settings) {
   const ot = new Map();
   const byUser = {};
   entries.filter((e) => !e.active).forEach((e) => (byUser[e.userId] ||= []).push(e));
-  for (const list of Object.values(byUser)) {
+  for (const [uid, list] of Object.entries(byUser)) {
+    const driver = isDriverId(uid);
+    const dailyLimit = driver ? 0 : settings.dailyOT;
+    const weeklyLimit = driver ? settings.driverWeeklyOT : settings.weeklyOT;
     list.sort((a, b) => a.date.localeCompare(b.date) || byStart(a, b));
     const dayTot = {}, weekReg = {};
     for (const e of list) {
       const h = e.hours || 0;
       let dailyOT = 0;
-      if (settings.dailyOT > 0) {
+      if (dailyLimit > 0) {
         const before = dayTot[e.date] || 0;
-        dailyOT = Math.max(0, h - Math.max(0, settings.dailyOT - before));
+        dailyOT = Math.max(0, h - Math.max(0, dailyLimit - before));
       }
       dayTot[e.date] = (dayTot[e.date] || 0) + h;
       const straight = h - dailyOT;
       let weeklyOT = 0;
-      if (settings.weeklyOT > 0) {
+      if (weeklyLimit > 0) {
         const wk = weekStartOf(e.date, settings.weekStart);
         const before = weekReg[wk] || 0;
-        weeklyOT = Math.max(0, straight - Math.max(0, settings.weeklyOT - before));
+        weeklyOT = Math.max(0, straight - Math.max(0, weeklyLimit - before));
         weekReg[wk] = before + straight - weeklyOT;
       }
       ot.set(e.id, dailyOT + weeklyOT);
@@ -124,6 +131,7 @@ const ROUTES = {
 function currentRoute() {
   const r = location.hash.replace(/^#\/?/, '');
   const tabs = isManager() ? ROUTES.manager : ROUTES.employee;
+  if (isManager() && r.startsWith('project/')) { ui.projectId = decodeURIComponent(r.slice(8)); return 'project'; }
   const allowed = tabs.map((t) => t[0]).concat(isManager() ? ['settings', 'hours'] : []);
   return allowed.includes(r) ? r : tabs[0][0];
 }
@@ -159,7 +167,7 @@ function restoreForm(root, keep) {
 
 function shellHTML(route) {
   const tabs = isManager() ? ROUTES.manager : ROUTES.employee;
-  const navRoute = route === 'settings' ? '' : route === 'hours' && isManager() ? 'clock' : route;
+  const navRoute = route === 'settings' ? '' : route === 'project' ? 'projects' : route === 'hours' && isManager() ? 'clock' : route;
   return `
   <header class="topbar">
     <a class="brand" href="#/"><img src="assets/logo-s.png" alt="Santoro's Logging"><span><b>${APP_NAME}</b><small>Santoro's Logging</small></span></a>
@@ -268,7 +276,7 @@ function friendly(err) {
 // ===========================================================================
 // Views
 // ===========================================================================
-const VIEWS = { clock: viewClock, hours: viewHours, dashboard: viewDashboard, timesheet: viewTimesheet, projects: viewProjects, crew: viewCrew, settings: viewSettings };
+const VIEWS = { clock: viewClock, hours: viewHours, dashboard: viewDashboard, timesheet: viewTimesheet, projects: viewProjects, project: viewProject, crew: viewCrew, settings: viewSettings };
 
 const projectOptions = (selectedId, extraId) => {
   const list = activeProjects();
@@ -292,6 +300,9 @@ function viewClock() {
   const mine = db.entries.filter((e) => e.userId === me.id);
   const active = mine.find((e) => e.active);
   const projects = activeProjects();
+  const driver = crewType(me) === 'driver';
+  const clockBtn = `<button class="btn btn-go btn-xl" data-act="clock-in">Clock In</button>
+        <p class="muted small center" style="margin:0">Records as <b id="round-preview"></b>. Times round to the nearest 15 minutes.</p>`;
   let top;
   if (active) {
     top = `<section class="card clock-card on">
@@ -301,17 +312,16 @@ function viewClock() {
       <div class="elapsed" data-elapsed="${active.id}">0:00</div>
       <p class="muted small" data-outpreview="${active.id}"></p>
       <button class="btn btn-stop btn-xl" data-act="clock-out" data-id="${active.id}">Clock Out</button>
-      ${projects.length > 1 ? `<label class="field" style="text-align:left"><span>Moving to another job? Switch project</span>
+      ${!driver && projects.length > 1 ? `<label class="field" style="text-align:left"><span>Moving to another job? Switch project</span>
         <select data-change="switch" data-id="${active.id}"><option value="">Choose project…</option>${projects.filter((p) => p.id !== active.projectId).map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>` : ''}
     </section>`;
   } else {
     const last = lsGet('lastProject');
     top = `<section class="card clock-card">
-      <img class="hero-logo" src="assets/logo-treeline.png" alt="Santoro's Logging">
-      ${projects.length ? `
+      <img class="hero-logo" src="assets/${driver ? 'logo-truck' : 'logo-treeline'}.png" alt="Santoro's Logging">
+      ${driver ? clockBtn : projects.length ? `
         <label class="field"><span>Project</span><select id="clock-project">${projectOptions(projects.some((p) => p.id === last) ? last : projects[0].id)}</select></label>
-        <button class="btn btn-go btn-xl" data-act="clock-in">Clock In</button>
-        <p class="muted small center" style="margin:0">Records as <b id="round-preview"></b>. Times round to the nearest 15 minutes.</p>`
+        ${clockBtn}`
       : `<p class="empty-note">No projects yet. ${isManager() ? 'Add one on the Projects tab.' : 'Ask your manager to add a project.'}</p>`}
     </section>`;
   }
@@ -367,13 +377,21 @@ function viewDashboard() {
   const end = today(), start = addDays(end, -6);
   const recent = db.entries.filter((e) => !e.active && e.date >= start && e.date <= end);
   const live = db.entries.filter((e) => e.active);
-  const per = {};
+  const per = {}, perDriver = {};
   for (const e of recent) {
+    if (!e.projectId) { // truck driver hours: no project
+      const d = (perDriver[e.userId] ||= { id: e.userId, hours: 0, ot: 0 });
+      d.hours += e.hours || 0;
+      d.ot += OT.get(e.id) || 0;
+      continue;
+    }
     const p = (per[e.projectId] ||= { id: e.projectId, hours: 0, ot: 0, people: new Set() });
     p.hours += e.hours || 0;
     p.ot += OT.get(e.id) || 0;
     p.people.add(e.userId);
   }
+  const drivers = Object.values(perDriver).sort((a, b) => b.hours - a.hours);
+  const hasDrivers = drivers.length || db.users.some((u) => crewType(u) === 'driver' && u.active !== false);
   const rows = Object.values(per).sort((a, b) => b.hours - a.hours);
   const otRows = rows.filter((r) => r.ot > 0).sort((a, b) => b.ot - a.ot);
   const total = sum(recent, (e) => e.hours), totalOT = sum(recent, (e) => OT.get(e.id));
@@ -382,32 +400,40 @@ function viewDashboard() {
   return `
     <div class="page-head"><div><h1>Dashboard</h1><p class="muted">Last 7 days · ${fmtShort(start)} – ${fmtShort(end)}</p></div></div>
     <section class="stats-row four">
-      <div class="stat"><span>Hours</span><b>${fmtHrs(total)}</b><small>all projects</small></div>
+      <div class="stat"><span>Hours</span><b>${fmtHrs(total)}</b><small>${hasDrivers ? 'loggers + drivers' : 'all projects'}</small></div>
       <div class="stat ${totalOT > 0 ? 'warn' : ''}"><span>Overtime</span><b>${fmtHrs(totalOT)}</b><small>hrs</small></div>
       <div class="stat"><span>On the clock</span><b>${live.length}</b><small>right now</small></div>
       <div class="stat"><span>Projects</span><b>${rows.length}</b><small>with hours</small></div>
     </section>
     <div class="dash-grid">
       <section class="card">
-        <div class="card-head"><h3>Hours by project</h3></div>
+        <div class="card-head"><h3>Hours by project</h3><span class="muted small">Tap a project for details</span></div>
         ${rows.length ? `<div class="bars">${rows.map((r) => `
-          <div class="bar-row"><div class="bar-label"><b>${esc(projectName(r.id))}</b><span>${fmtHrs(r.hours)} h</span></div>
+          <button class="bar-row link" data-act="open-project" data-id="${r.id}"><div class="bar-label"><b>${esc(projectName(r.id))}</b><span>${fmtHrs(r.hours)} h ›</span></div>
           <div class="bar-track" title="${fmtHrs(r.hours - r.ot)} regular + ${fmtHrs(r.ot)} overtime">
             <div class="bar-fill" style="width:${((r.hours - r.ot) / maxH) * 100}%"></div><div class="bar-fill ot" style="width:${(r.ot / maxH) * 100}%"></div>
-          </div><span class="muted small">${r.people.size} ${r.people.size === 1 ? 'person' : 'people'}</span></div>`).join('')}</div>
+          </div><span class="muted small">${fmtHrs(r.hours - r.ot)} regular · ${fmtHrs(r.ot)} OT · ${r.people.size} ${r.people.size === 1 ? 'person' : 'people'}</span></button>`).join('')}</div>
           <div class="legend"><span><i style="background:var(--green-600)"></i>Regular</span><span><i style="background:var(--gold)"></i>Overtime</span></div>`
         : `<div class="empty"><img src="assets/logo-saw.png" alt="">No hours in the last 7 days.</div>`}
       </section>
       <section class="card">
         <div class="card-head"><h3>Overtime by project</h3></div>
         ${otRows.length ? `<div class="bars">${otRows.map((r) => `
-          <div class="bar-row"><div class="bar-label"><b>${esc(projectName(r.id))}</b><span>${fmtHrs(r.ot)} h OT</span></div>
+          <button class="bar-row link" data-act="open-project" data-id="${r.id}"><div class="bar-label"><b>${esc(projectName(r.id))}</b><span>${fmtHrs(r.ot)} h OT ›</span></div>
           <div class="bar-track"><div class="bar-fill ot" style="width:${(r.ot / maxOT) * 100}%"></div></div>
-          <span class="muted small">${Math.round((r.ot / r.hours) * 100)}% of this project's hours</span></div>`).join('')}</div>`
-        : `<p class="muted" style="margin:0">No overtime in the last 7 days.</p>`}
-        <p class="muted small" style="margin:14px 0 0">Overtime = over ${db.settings.weeklyOT || '—'} hrs/week${db.settings.dailyOT > 0 ? ` or ${db.settings.dailyOT} hrs/day` : ''} per person. <a href="#/settings">Change</a></p>
+          <span class="muted small">${Math.round((r.ot / r.hours) * 100)}% of this project's hours</span></button>`).join('')}</div>`
+        : `<p class="muted" style="margin:0">No project overtime in the last 7 days.</p>`}
+        <p class="muted small" style="margin:14px 0 0">Logger overtime = over ${db.settings.weeklyOT || '—'} hrs/week${db.settings.dailyOT > 0 ? ` or ${db.settings.dailyOT} hrs/day` : ''} per person. <a href="#/settings">Change</a></p>
       </section>
     </div>
+    ${hasDrivers ? `<section class="card">
+      <div class="card-head"><h3>Truck drivers</h3><span class="total">${fmtHrs(sum(drivers, (d) => d.hours))} h · ${fmtHrs(sum(drivers, (d) => d.ot))} OT</span></div>
+      ${drivers.length ? `<div class="sheet-wrap flat"><table class="sheet">
+        <thead><tr><th>Driver</th><th class="num">Regular</th><th class="num">OT</th><th class="num">Total</th></tr></thead>
+        <tbody>${drivers.map((d) => `<tr data-act="driver-week" data-id="${d.id}"><td><b>${esc(userName(d.id))}</b></td><td class="num">${fmtHrs(d.hours - d.ot)}</td><td class="num ${d.ot ? 'ot' : 'zero'}">${fmtHrs(d.ot)}</td><td class="num"><b>${fmtHrs(d.hours)}</b></td></tr>`).join('')}</tbody>
+      </table></div>` : '<p class="muted small" style="margin:0">No driver hours in the last 7 days.</p>'}
+      <p class="muted small" style="margin:10px 0 0">Driver overtime = over ${db.settings.driverWeeklyOT || '—'} hrs/week. Not counted toward any project.</p>
+    </section>` : ''}
     <section class="card">
       <div class="card-head"><h3>On the clock now</h3><span class="total">${live.length}</span></div>
       ${live.length ? `<ul class="live-list">${live.map((e) => `<li><div><b>${esc(userName(e.userId))}</b><span>${esc(projectName(e.projectId))} · since ${fmtTime(e.start)}</span></div><span class="t" data-elapsed="${e.id}"></span></li>`).join('')}</ul>`
@@ -426,13 +452,20 @@ function presetRange(p) {
   return [ws, addDays(ws, 6)];
 }
 function tsState() {
-  if (!ui.ts) { const [from, to] = presetRange('this-week'); ui.ts = { preset: 'this-week', from, to, user: '', project: '', view: 'entries' }; }
+  if (!ui.ts) { const [from, to] = presetRange('this-week'); ui.ts = { preset: 'this-week', from, to, user: '', project: '', crew: '', view: 'grid' }; }
   return ui.ts;
+}
+// Shared timesheet filters. Project "__trucking" = truck driver hours (no project).
+function tsMatch(e) {
+  const ts = tsState();
+  return (!ts.user || e.userId === ts.user)
+    && (!ts.project || (ts.project === '__trucking' ? !e.projectId : e.projectId === ts.project))
+    && (!ts.crew || crewType(userById(e.userId)) === ts.crew);
 }
 function tsEntries() {
   const ts = tsState();
   return db.entries
-    .filter((e) => e.date >= ts.from && e.date <= ts.to && (!ts.user || e.userId === ts.user) && (!ts.project || e.projectId === ts.project))
+    .filter((e) => e.date >= ts.from && e.date <= ts.to && tsMatch(e))
     .sort((a, b) => b.date.localeCompare(a.date) || userName(a.userId).localeCompare(userName(b.userId)) || byStart(a, b));
 }
 
@@ -457,8 +490,13 @@ function viewTimesheet() {
       </div>`}
       <div class="row2">
         <label class="field"><span>Employee</span><select id="ts-user" data-change="ts-user"><option value="">Everyone</option>${people.map((u) => `<option value="${u.id}" ${ts.user === u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></label>
-        <label class="field"><span>Project</span><select id="ts-project" data-change="ts-project"><option value="">All projects</option>${allProjects.map((p) => `<option value="${p.id}" ${ts.project === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        <label class="field"><span>Project</span><select id="ts-project" data-change="ts-project"><option value="">All projects</option>${allProjects.map((p) => `<option value="${p.id}" ${ts.project === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="__trucking" ${ts.project === '__trucking' ? 'selected' : ''}>Trucking (drivers)</option></select></label>
       </div>
+      <label class="field"><span>Job type</span><select id="ts-crew" data-change="ts-crew">
+        <option value="">Loggers and truck drivers</option>
+        <option value="logger" ${ts.crew === 'logger' ? 'selected' : ''}>Loggers only</option>
+        <option value="driver" ${ts.crew === 'driver' ? 'selected' : ''}>Truck drivers only</option>
+      </select></label>
     </section>`;
   return `
     <div class="page-head"><div><h1>Timesheet</h1><p class="muted">Tap any row to change it.</p></div></div>
@@ -499,20 +537,23 @@ function gridHTML() {
   const ts = tsState();
   const ws = weekStartOf(ts.from);
   const days = [...Array(7)].map((_, i) => addDays(ws, i));
-  const list = db.entries.filter((e) => !e.active && e.date >= ws && e.date <= days[6] && (!ts.project || e.projectId === ts.project) && (!ts.user || e.userId === ts.user));
+  const list = db.entries.filter((e) => !e.active && e.date >= ws && e.date <= days[6] && tsMatch(e));
   const ids = new Set(list.map((e) => e.userId));
-  const people = db.users.filter((u) => (ids.has(u.id) || (u.active && !ts.user)) && (!ts.user || u.id === ts.user)).sort(byName);
+  const showIdle = !ts.user && !ts.project; // list everyone active, even with no hours, unless filtering
+  const people = db.users.filter((u) => (ids.has(u.id) || (showIdle && u.active !== false && (!ts.crew || crewType(u) === ts.crew)))
+    && (!ts.user || u.id === ts.user)).sort((a, b) => crewType(a).localeCompare(crewType(b)) * -1 || byName(a, b));
   if (!people.length) return `<section class="card empty"><img src="assets/logo-peak.png" alt="">No one to show.</section>`;
   const cell = (uid, d) => sum(list.filter((e) => e.userId === uid && e.date === d), (e) => e.hours);
+  const totH = sum(list, (e) => e.hours), totOT = sum(list, (e) => OT.get(e.id));
   return `<div class="sheet-wrap"><table class="sheet">
-    <thead><tr><th>Employee</th>${days.map((d) => `<th class="num">${parseDate(d).toLocaleDateString(undefined, { weekday: 'short' })}<br>${fmtShort(d)}</th>`).join('')}<th class="num">Total</th><th class="num">OT</th></tr></thead>
+    <thead><tr><th>Employee</th>${days.map((d) => `<th class="num">${parseDate(d).toLocaleDateString(undefined, { weekday: 'short' })}<br>${fmtShort(d)}</th>`).join('')}<th class="num">Reg</th><th class="num">OT</th><th class="num">Total</th></tr></thead>
     <tbody>${people.map((u) => {
       const mine = list.filter((e) => e.userId === u.id);
-      const ot = sum(mine, (e) => OT.get(e.id));
-      return `<tr data-act="grid-person" data-id="${u.id}"><td><b>${esc(u.name)}</b></td>${days.map((d) => { const h = cell(u.id, d); return `<td class="num ${h ? '' : 'zero'}">${h ? fmtHrs(h) : '–'}</td>`; }).join('')}
-        <td class="num"><b>${fmtHrs(sum(mine, (e) => e.hours))}</b></td><td class="num ${ot ? 'ot' : 'zero'}">${fmtHrs(ot)}</td></tr>`;
+      const h = sum(mine, (e) => e.hours), ot = sum(mine, (e) => OT.get(e.id));
+      return `<tr data-act="grid-person" data-id="${u.id}"><td><b>${esc(u.name)}</b><br><small class="muted">${CREW_LABEL[crewType(u)]}</small></td>${days.map((d) => { const c = cell(u.id, d); return `<td class="num ${c ? '' : 'zero'}">${c ? fmtHrs(c) : '–'}</td>`; }).join('')}
+        <td class="num">${fmtHrs(h - ot)}</td><td class="num ${ot ? 'ot' : 'zero'}">${fmtHrs(ot)}</td><td class="num"><b>${fmtHrs(h)}</b></td></tr>`;
     }).join('')}</tbody>
-    <tfoot><tr><td>Total</td>${days.map((d) => `<td class="num">${fmtHrs(sum(list.filter((e) => e.date === d), (e) => e.hours))}</td>`).join('')}<td class="num">${fmtHrs(sum(list, (e) => e.hours))}</td><td class="num">${fmtHrs(sum(list, (e) => OT.get(e.id)))}</td></tr></tfoot>
+    <tfoot><tr><td>Total</td>${days.map((d) => `<td class="num">${fmtHrs(sum(list.filter((e) => e.date === d), (e) => e.hours))}</td>`).join('')}<td class="num">${fmtHrs(totH - totOT)}</td><td class="num">${fmtHrs(totOT)}</td><td class="num">${fmtHrs(totH)}</td></tr></tfoot>
   </table></div><p class="muted small" style="margin:0">Tap a person to see their entries for this week.</p>`;
 }
 
@@ -525,17 +566,75 @@ function viewProjects() {
   };
   const item = (p) => {
     const s = stats(p);
-    return `<button class="list-item" data-act="edit-project" data-id="${p.id}">
+    return `<button class="list-item" data-act="open-project" data-id="${p.id}">
       <span class="what"><b>${esc(p.name)}${p.active === false ? '<span class="tag off">Archived</span>' : ''}</b><span>${[p.code ? 'Job #' + p.code : '', p.location].filter(Boolean).map(esc).join(' · ') || 'No details'}</span></span>
       <span class="side">${fmtHrs(s.week)} h<small>last 7 days · ${fmtHrs(s.total)} total</small></span></button>`;
   };
   const active = db.projects.filter((p) => p.active !== false).sort(byName);
   const archived = db.projects.filter((p) => p.active === false).sort(byName);
   return `
-    <div class="page-head"><div><h1>Projects</h1><p class="muted">Jobs your crew can log hours to.</p></div>
+    <div class="page-head"><div><h1>Projects</h1><p class="muted">Tap a project to see its hours by logger.</p></div>
       <button class="btn btn-go btn-sm" data-act="edit-project">${ICON.plus} New project</button></div>
     <section class="card list-card">${active.length ? active.map(item).join('') : `<div class="empty"><img src="assets/logo-saw.png" alt="">No projects yet. Add your first job.</div>`}</section>
     ${archived.length ? `<details class="card list-card"><summary>Archived (${archived.length})</summary>${archived.map(item).join('')}</details>` : ''}`;
+}
+
+// ---------- One project: regular / overtime / hours per logger ----------
+const PROJECT_PRESETS = [['last-7', 'Last 7 days'], ['this-week', 'This week'], ['last-week', 'Last week'], ['this-month', 'This month'], ['last-month', 'Last month'], ['all', 'All time'], ['custom', 'Custom dates']];
+function projectRange() {
+  const pr = (ui.pr ||= { preset: 'last-7' });
+  if (pr.preset === 'custom') return [pr.from, pr.to];
+  if (pr.preset === 'all') return ['0000-01-01', '9999-12-31'];
+  return presetRange(pr.preset);
+}
+function viewProject() {
+  const p = projectById(ui.projectId);
+  if (!p) return `<section class="card empty"><img src="assets/logo-saw.png" alt="">That project was not found. <a href="#/projects">Back to projects</a></section>`;
+  const pr = (ui.pr ||= { preset: 'last-7' });
+  const [from, to] = projectRange();
+  const list = db.entries.filter((e) => e.projectId === p.id && !e.active && e.date >= from && e.date <= to);
+  const total = sum(list, (e) => e.hours), ot = sum(list, (e) => OT.get(e.id));
+  const per = {};
+  for (const e of list) {
+    const r = (per[e.userId] ||= { id: e.userId, hours: 0, ot: 0, days: new Set() });
+    r.hours += e.hours || 0;
+    r.ot += OT.get(e.id) || 0;
+    r.days.add(e.date);
+  }
+  const rows = Object.values(per).sort((a, b) => b.hours - a.hours);
+  const live = db.entries.filter((e) => e.active && e.projectId === p.id);
+  const rangeLabel = pr.preset === 'all' ? 'All time' : `${fmtShort(from)} – ${fmtShort(to)}`;
+  return `
+    <a href="#/projects" class="muted small" style="text-decoration:none">‹ All projects</a>
+    <div class="page-head"><div><h1>${esc(p.name)}${p.active === false ? '<span class="tag off">Archived</span>' : ''}</h1>
+      <p class="muted">${[p.code ? 'Job #' + p.code : '', p.location].filter(Boolean).map(esc).join(' · ') || rangeLabel}</p></div>
+      <button class="btn btn-outline btn-sm" data-act="edit-project" data-id="${p.id}">Edit project</button></div>
+    <section class="card filters">
+      <label class="field"><span>Dates</span><select id="pr-preset" data-change="pr-preset">${PROJECT_PRESETS.map(([v, l]) => `<option value="${v}" ${pr.preset === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      ${pr.preset === 'custom' ? `<div class="row2">
+        <label class="field"><span>From</span><input type="date" id="pr-from" value="${from}" data-change="pr-from"></label>
+        <label class="field"><span>To</span><input type="date" id="pr-to" value="${to}" data-change="pr-to"></label></div>` : ''}
+    </section>
+    <section class="stats-row four">
+      <div class="stat"><span>Total</span><b>${fmtHrs(total)}</b><small>hrs · ${esc(rangeLabel)}</small></div>
+      <div class="stat"><span>Regular</span><b>${fmtHrs(total - ot)}</b><small>hrs</small></div>
+      <div class="stat ${ot > 0 ? 'warn' : ''}"><span>Overtime</span><b>${fmtHrs(ot)}</b><small>hrs</small></div>
+      <div class="stat"><span>Loggers</span><b>${rows.length}</b><small>worked here</small></div>
+    </section>
+    <section>
+      <div class="card-head" style="margin:4px 2px 8px"><h3>Hours per logger</h3>
+        <button class="btn btn-outline btn-sm" data-act="project-entries" data-id="${p.id}">${ICON.table} See every entry</button></div>
+      ${rows.length ? `<div class="sheet-wrap"><table class="sheet">
+        <thead><tr><th>Logger</th><th class="num">Regular</th><th class="num">OT</th><th class="num">Total</th><th class="num">Days</th></tr></thead>
+        <tbody>${rows.map((r) => `<tr data-act="project-person" data-id="${r.id}" data-project="${p.id}">
+          <td><b>${esc(userName(r.id))}</b></td><td class="num">${fmtHrs(r.hours - r.ot)}</td>
+          <td class="num ${r.ot ? 'ot' : 'zero'}">${fmtHrs(r.ot)}</td><td class="num"><b>${fmtHrs(r.hours)}</b></td><td class="num">${r.days.size}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>Total</td><td class="num">${fmtHrs(total - ot)}</td><td class="num">${fmtHrs(ot)}</td><td class="num">${fmtHrs(total)}</td><td class="num"></td></tr></tfoot>
+      </table></div><p class="muted small" style="margin:8px 2px 0">Tap a logger to see their entries on this project.</p>`
+      : `<section class="card empty"><img src="assets/logo-peak.png" alt="">No hours on this project for these dates.</section>`}
+    </section>
+    ${live.length ? `<section class="card"><div class="card-head"><h3>On this project now</h3><span class="total">${live.length}</span></div>
+      <ul class="live-list">${live.map((e) => `<li><div><b>${esc(userName(e.userId))}</b><span>since ${fmtTime(e.start)}</span></div><span class="t" data-elapsed="${e.id}"></span></li>`).join('')}</ul></section>` : ''}`;
 }
 
 // ---------- Crew ----------
@@ -550,7 +649,7 @@ function viewCrew() {
       const live = db.entries.some((e) => e.userId === u.id && e.active);
       return `<button class="list-item" data-act="edit-person" data-id="${u.id}">
         <span class="badge-circle ${u.role === 'manager' ? 'mgr' : ''}">${esc(initials(u.name))}</span>
-        <span class="what"><b>${esc(u.name)}${u.active === false ? '<span class="tag off">Off</span>' : ''}${live ? '<span class="tag live">On clock</span>' : ''}</b><span>@${esc(u.username)} · ${u.role === 'manager' ? 'Manager' : 'Employee'}</span></span>
+        <span class="what"><b>${esc(u.name)}${u.active === false ? '<span class="tag off">Off</span>' : ''}${live ? '<span class="tag live">On clock</span>' : ''}</b><span>@${esc(u.username)} · ${CREW_LABEL[crewType(u)]}${u.role === 'manager' ? ' · Manager' : ''}</span></span>
         <span class="side">${fmtHrs(sum(week, (e) => e.hours))} h<small>this week</small></span></button>`;
     }).join('')}</section>`;
 }
@@ -562,9 +661,15 @@ function viewSettings() {
     <div class="page-head"><div><h1>Settings</h1></div></div>
     <form class="card settings-section" id="settings-form">
       <h3>Overtime rules</h3>
+      <p class="muted small" style="margin-bottom:-4px"><b>Loggers</b></p>
       <div class="row2">
         <label class="field"><span>Weekly OT after (hrs)</span><input name="weeklyOT" type="number" min="0" max="168" step="0.25" value="${s.weeklyOT}" inputmode="decimal"></label>
         <label class="field"><span>Daily OT after (hrs)</span><input name="dailyOT" type="number" min="0" max="24" step="0.25" value="${s.dailyOT}" inputmode="decimal"></label>
+      </div>
+      <p class="muted small" style="margin-bottom:-4px"><b>Truck drivers</b> (weekly only, no daily limit)</p>
+      <div class="row2">
+        <label class="field"><span>Weekly OT after (hrs)</span><input name="driverWeeklyOT" type="number" min="0" max="168" step="0.25" value="${s.driverWeeklyOT}" inputmode="decimal"></label>
+        <span></span>
       </div>
       <p class="muted small">Use 0 to turn a rule off. Federal law uses 40 hrs/week. Some states also use a daily limit.</p>
       <label class="field"><span>Pay week starts on</span><select name="weekStart">${DAY_NAMES.map((d, i) => `<option value="${i}" ${+s.weekStart === i ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
@@ -618,7 +723,7 @@ function entryModal(entry, { userId } = {}) {
       ${readOnly ? `<p class="notice" style="margin-bottom:12px">${lockMsg}</p>` : ''}
       <fieldset ${readOnly ? 'disabled' : ''}>
         ${mgr ? `<label class="field"><span>Employee</span><select name="userId">${people.map((u) => `<option value="${u.id}" ${u.id === e.userId ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></label>` : ''}
-        <label class="field"><span>Project</span><select name="projectId"><option value="">Choose project…</option>${projectOptions(e.projectId, e.projectId)}</select></label>
+        <label class="field project-field" ${isDriverId(e.userId) ? 'hidden' : ''}><span>Project</span><select name="projectId"><option value="">Choose project…</option>${projectOptions(e.projectId, e.projectId)}</select></label>
         <label class="field"><span>Date</span><input type="date" name="date" value="${e.date}" ${minDate ? `min="${minDate}"` : ''} max="${mgr ? '' : today()}"></label>
         ${entry?.active ? '<p class="notice">This person is on the clock. Leave End blank to keep them clocked in.</p>' : `
         <div class="seg" role="radiogroup" aria-label="How to enter time">
@@ -659,6 +764,7 @@ function entryModal(entry, { userId } = {}) {
     form.addEventListener('change', (ev) => {
       const t = ev.target;
       if (t.name === 'mode') form.dataset.mode = t.value;
+      if (t.name === 'userId') form.querySelector('.project-field').hidden = isDriverId(t.value);
       if (t.type === 'time' && t.value) t.value = roundTime(t.value);
       if (t.name === 'hours' && t.value) t.value = roundHours(parseFloat(t.value)) || '';
       preview();
@@ -674,12 +780,13 @@ function entryModal(entry, { userId } = {}) {
         ...(entry || {}),
         id: entry?.id || newId(),
         userId: mgr ? f.get('userId') : db.me.id,
-        projectId: f.get('projectId'),
+        projectId: f.get('projectId') || null,
         date: f.get('date'),
         notes: String(f.get('notes') || '').trim(),
         updatedAt: Date.now(),
       };
-      if (!rec.projectId) return formError('Pick a project.');
+      if (isDriverId(rec.userId)) rec.projectId = null; // truck drivers don't log to projects
+      else if (!rec.projectId) return formError('Pick a project.');
       if (!rec.date) return formError('Pick a date.');
       if (!mgr && (rec.date > today() || rec.date < minDate)) return formError(`You can only log hours for the last ${EDIT_WINDOW_DAYS} days.`);
       if (m === 'times') {
@@ -704,7 +811,7 @@ function entryModal(entry, { userId } = {}) {
       if (mgr && rec.userId !== db.me.id) {
         Object.assign(rec, { editedBy: db.me.name, editedAt: Date.now(), lockedByManager: true });
       }
-      lsSet('lastProject', rec.projectId);
+      if (rec.projectId) lsSet('lastProject', rec.projectId);
       store.save('entries', rec);
       closeModal();
       toast(entry ? 'Entry updated' : `${fmtHrs(rec.hours)} hrs saved`);
@@ -766,6 +873,13 @@ function personModal(u) {
             <button type="button" class="btn btn-outline btn-sm" data-act="random-pin">New random PIN</button></div>
           <small class="muted">${u ? 'Type a new PIN, then Save. Tell them the new PIN.' : store.canResetPins ? 'Tell them this PIN. You can reset it any time.' : 'Tell them this PIN and ask them to remember it.'}</small>
         </div>`}
+        <div class="field"><span>Job type</span>
+          <div class="seg" role="radiogroup" aria-label="Job type">
+            <label><input type="radio" name="crewType" value="logger" ${crewType(u) === 'logger' ? 'checked' : ''}>Logger</label>
+            <label><input type="radio" name="crewType" value="driver" ${crewType(u) === 'driver' ? 'checked' : ''}>Truck Driver</label>
+          </div>
+          <small class="muted">Loggers pick a project when they log hours. Truck drivers don't, and their overtime starts after ${db.settings.driverWeeklyOT || 40} hrs/week.</small>
+        </div>
         <label class="field"><span>Role</span><select name="role" ${self ? 'disabled' : ''}>
           <option value="employee" ${u?.role !== 'manager' ? 'selected' : ''}>Employee (logs own hours)</option>
           <option value="manager" ${u?.role === 'manager' ? 'selected' : ''}>Manager (sees and changes everything)</option>
@@ -784,6 +898,7 @@ function personModal(u) {
       const name = String(f.get('name') || '').trim();
       const pin = String(f.get('pin') || '');
       const role = self ? 'manager' : f.get('role');
+      const crew = f.get('crewType') === 'driver' ? 'driver' : 'logger';
       if (!name) return formError('Enter a name.');
       const btn = ev.target.querySelector('.btn-go');
       try {
@@ -792,13 +907,13 @@ function personModal(u) {
           if (!username) return formError('Enter a username (letters, numbers, dots or dashes).');
           if (!isPin(pin)) return formError('The PIN must be exactly 4 digits.');
           btn.disabled = true; btn.textContent = 'Adding…';
-          await store.createUser({ name, username, role }, pin);
+          await store.createUser({ name, username, role, crewType: crew }, pin);
           toast(`${firstName(name)} signs in as "${username}" with PIN ${pin}`);
         } else {
           if (pin && !isPin(pin)) return formError('The new PIN must be exactly 4 digits.');
           btn.disabled = true; btn.textContent = 'Saving…';
           if (pin) await store.setPin(u.id, pin); // reset first: if it fails, nothing else changes
-          store.save('users', { ...u, name, role, active: self ? true : f.get('active') === 'on' });
+          store.save('users', { ...u, name, role, crewType: crew, active: self ? true : f.get('active') === 'on' });
           toast(pin ? `PIN reset. ${firstName(name)}'s new PIN is ${pin}` : 'Saved');
         }
         closeModal();
@@ -829,11 +944,12 @@ function accountModal() {
 // Actions
 // ===========================================================================
 function clockIn() {
-  const pid = $('#clock-project')?.value;
-  if (!pid) return toast('Pick a project first', 'error');
+  const driver = crewType(db.me) === 'driver';
+  const pid = driver ? null : $('#clock-project')?.value;
+  if (!driver && !pid) return toast('Pick a project first', 'error');
   if (db.entries.some((e) => e.userId === db.me.id && e.active)) return toast('You are already clocked in', 'error');
   const t = roundNow();
-  lsSet('lastProject', pid);
+  if (pid) lsSet('lastProject', pid);
   store.save('entries', {
     id: newId(), userId: db.me.id, projectId: pid, date: dateStr(t), start: hhmm(t), end: null, hours: 0,
     active: true, method: 'clock', notes: '', createdAt: Date.now(), updatedAt: Date.now(), createdBy: db.me.id,
@@ -874,11 +990,11 @@ function download(name, text, type) {
 
 function toCSV(entries) {
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const head = ['Date', 'Employee', 'Username', 'Project', 'Job #', 'Start', 'End', 'Hours', 'Regular', 'Overtime', 'Status', 'Notes', 'Changed by manager'];
+  const head = ['Date', 'Employee', 'Username', 'Job type', 'Project', 'Job #', 'Start', 'End', 'Hours', 'Regular', 'Overtime', 'Status', 'Notes', 'Changed by manager'];
   const rows = entries.map((e) => {
     const u = userById(e.userId) || {}, p = projectById(e.projectId) || {};
     const ot = OT.get(e.id) || 0;
-    return [e.date, u.name, u.username, p.name || 'Removed project', p.code, e.start ? fmtTime(e.start) : '', e.end ? fmtTime(e.end) : '',
+    return [e.date, u.name, u.username, CREW_LABEL[crewType(u)], projectName(e.projectId), p.code, e.start ? fmtTime(e.start) : '', e.end ? fmtTime(e.end) : '',
       e.active ? '' : e.hours, e.active ? '' : (e.hours || 0) - ot, e.active ? '' : ot, e.active ? 'On the clock' : 'Done', e.notes, e.editedBy || ''].map(q).join(',');
   });
   return '﻿' + [head.map(q).join(','), ...rows].join('\r\n');
@@ -889,7 +1005,30 @@ function randomPin() {
   return String(n % 10000).padStart(4, '0');
 }
 
+// Open the timesheet's entry list filtered to a project / person and the
+// project page's current date range.
+function showEntries({ project = '', user = '' }) {
+  let [from, to] = projectRange();
+  if (from === '0000-01-01') {
+    const dates = db.entries.filter((e) => (!project || e.projectId === project) && (!user || e.userId === user)).map((e) => e.date).sort();
+    [from, to] = dates.length ? [dates[0], dates[dates.length - 1]] : presetRange('this-week');
+  }
+  Object.assign(tsState(), { view: 'entries', preset: 'custom', from, to, project, user, crew: '' });
+  location.hash = '#/timesheet';
+}
+
 const actions = {
+  'open-project': (el) => {
+    if (el.closest('.bars')) ui.pr = { preset: 'last-7' }; // from the dashboard: match its 7-day window
+    location.hash = '#/project/' + encodeURIComponent(el.dataset.id);
+  },
+  'project-entries': (el) => showEntries({ project: el.dataset.id }),
+  'project-person': (el) => showEntries({ project: el.dataset.project, user: el.dataset.id }),
+  'driver-week': (el) => {
+    const [from, to] = presetRange('last-7');
+    Object.assign(tsState(), { view: 'entries', preset: 'last-7', from, to, project: '', user: el.dataset.id, crew: '' });
+    location.hash = '#/timesheet';
+  },
   'random-pin': (el) => { const box = el.parentElement.querySelector('[data-pin]'); box.value = randomPin(); box.focus(); },
   'clock-in': clockIn,
   'clock-out': (el) => clockOut(el.dataset.id),
@@ -903,6 +1042,7 @@ const actions = {
   'delete-project': (el) => {
     if (!confirm('Delete this project? This cannot be undone.')) return;
     store.remove('projects', el.dataset.id); closeModal(); toast('Project deleted');
+    if (location.hash.startsWith('#/project/')) location.hash = '#/projects';
   },
   'edit-person': (el) => personModal(el.dataset.id ? userById(el.dataset.id) : null),
   'account': accountModal,
@@ -969,6 +1109,14 @@ const changes = {
   'ts-to': (el) => { const ts = tsState(); if (!el.value) return; ts.to = el.value; ts.preset = 'custom'; if (ts.from > ts.to) ts.from = ts.to; render(); },
   'ts-user': (el) => { tsState().user = el.value; render(); },
   'ts-project': (el) => { tsState().project = el.value; render(); },
+  'ts-crew': (el) => { tsState().crew = el.value; render(); },
+  'pr-preset': (el) => {
+    const pr = (ui.pr ||= {});
+    if (el.value === 'custom') { const [f, t] = projectRange(); Object.assign(pr, { from: f === '0000-01-01' ? presetRange('last-7')[0] : f, to: t === '9999-12-31' ? today() : t }); }
+    pr.preset = el.value; render();
+  },
+  'pr-from': (el) => { const pr = ui.pr; if (!el.value) return; pr.from = el.value; if (pr.to < pr.from) pr.to = pr.from; render(); },
+  'pr-to': (el) => { const pr = ui.pr; if (!el.value) return; pr.to = el.value; if (pr.from > pr.to) pr.from = pr.to; render(); },
 };
 
 document.addEventListener('click', (ev) => {
@@ -986,7 +1134,7 @@ document.addEventListener('submit', (ev) => {
   ev.preventDefault();
   const f = new FormData(ev.target);
   const num = (k, max) => Math.min(max, Math.max(0, roundHours(parseFloat(f.get(k)) || 0)));
-  store.saveSettings({ ...DEFAULT_SETTINGS, ...db.settings, weeklyOT: num('weeklyOT', 168), dailyOT: num('dailyOT', 24), weekStart: Number(f.get('weekStart')) });
+  store.saveSettings({ ...DEFAULT_SETTINGS, ...db.settings, weeklyOT: num('weeklyOT', 168), dailyOT: num('dailyOT', 24), driverWeeklyOT: num('driverWeeklyOT', 168), weekStart: Number(f.get('weekStart')) });
   toast('Overtime rules saved');
 });
 

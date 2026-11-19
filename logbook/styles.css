@@ -22,6 +22,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
@@ -198,6 +199,9 @@ input.pin::placeholder { letter-spacing: .3em; color: #c9c5b8; }
 /* ---------- dashboard ---------- */
 .bars { display: grid; gap: 12px; }
 .bar-row { display: grid; gap: 4px; }
+button.bar-row.link { width: 100%; text-align: left; background: none; border: 0; padding: 6px; margin: -6px; border-radius: 10px; cursor: pointer; }
+button.bar-row.link:hover { background: var(--green-100); }
+.sheet-wrap.flat { box-shadow: none; border: 1px solid var(--line); }
 .bar-label { display: flex; justify-content: space-between; gap: 10px; font-size: .9rem; }
 .bar-label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-label span { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }

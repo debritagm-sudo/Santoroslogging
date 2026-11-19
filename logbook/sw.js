@@ -1,6 +1,6 @@
 // Offline support: keeps a copy of the app on the phone so it opens with no signal.
 // Bump VERSION when you publish changes to force every phone to refresh its copy.
-const VERSION = 'logbook-v2';
+const VERSION = 'logbook-v3';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'store.js', 'config.js', 'manifest.json',
   'assets/icon-192.png', 'assets/icon-512.png', 'assets/apple-touch-icon.png',

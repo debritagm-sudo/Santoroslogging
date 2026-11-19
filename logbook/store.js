@@ -3,7 +3,8 @@
 //   cloudAdapter  – Firebase Auth + Firestore with offline persistence
 import { FIREBASE_CONFIG, PIN_RESET_ENABLED } from './config.js';
 
-export const DEFAULT_SETTINGS = { weeklyOT: 40, dailyOT: 0, weekStart: 0 };
+// weeklyOT / dailyOT apply to loggers; driverWeeklyOT applies to truck drivers.
+export const DEFAULT_SETTINGS = { weeklyOT: 40, dailyOT: 0, driverWeeklyOT: 40, weekStart: 0 };
 
 // Shared in-memory snapshot the UI renders from.
 export const db = {
@@ -94,8 +95,8 @@ function deviceAdapter() {
     }
   });
 
-  const makeUser = async ({ name, username, role }, pin) => ({
-    id: newId(), name: name.trim(), username: normUsername(username), role, active: true,
+  const makeUser = async ({ name, username, role, crewType = 'logger' }, pin) => ({
+    id: newId(), name: name.trim(), username: normUsername(username), role, crewType, active: true,
     createdAt: Date.now(), pwHash: await hashPw(normUsername(username), pin),
   });
 
@@ -264,7 +265,7 @@ function cloudAdapter(cfg) {
         const b = S.writeBatch(fs);
         b.set(S.doc(fs, 'meta', 'setup'), { done: true, at: Date.now() });
         b.set(S.doc(fs, 'users', cred.user.uid), {
-          name: name.trim(), username: normUsername(username), role: 'manager', active: true, createdAt: Date.now(),
+          name: name.trim(), username: normUsername(username), role: 'manager', crewType: 'logger', active: true, createdAt: Date.now(),
         });
         await b.commit();
       } finally { settingUp = false; }
@@ -287,7 +288,8 @@ function cloudAdapter(cfg) {
         const cred = await A.createUserWithEmailAndPassword(auth2, toEmail(info.username), pinToPassword(pin));
         await A.signOut(auth2);
         await S.setDoc(S.doc(fs, 'users', cred.user.uid), {
-          name: info.name.trim(), username: normUsername(info.username), role: info.role, active: true, createdAt: Date.now(),
+          name: info.name.trim(), username: normUsername(info.username), role: info.role,
+          crewType: info.crewType || 'logger', active: true, createdAt: Date.now(),
         });
         return cred.user.uid;
       } finally { F.deleteApp(app2); }
